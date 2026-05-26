@@ -1,6 +1,7 @@
 #include "cpu.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 uint16_t fetch(Chip8* cpu) {
     if(cpu->PC >= 4094){
@@ -28,7 +29,7 @@ void execute(Chip8 *cpu, uint16_t opcode) {
         case 0x0000:
             switch(opcode) {
                 case 0x00E0:
-                    // clear display
+                    memset(cpu->display, 0, sizeof(cpu->display));
                     break;
                 case 0x00EE:
                     cpu->PC = cpu->stack[cpu->SP];
@@ -80,10 +81,8 @@ void execute(Chip8 *cpu, uint16_t opcode) {
                     cpu->V[x] = cpu->V[x] ^ cpu->V[y];
                     break;
                 case 0x8004:
-                    if(cpu->V[x] + cpu->V[y] > 255) {
-                        cpu->V[0xF] = 1;
-                        cpu->V[x] = cpu->V[x] + cpu->V[y];
-                    }
+                    cpu->V[0xF] = cpu->V[x] + cpu->V[y] > 255 ? 1 : 0;
+                    cpu->V[x] = cpu->V[x] + cpu->V[y];
                     break;
                 case 0x8005:
                     if(cpu->V[x] > cpu->V[y]) {
@@ -94,7 +93,8 @@ void execute(Chip8 *cpu, uint16_t opcode) {
                     cpu->V[x] = cpu->V[x] - cpu->V[y];
                     break;
                 case 0x8006:
-                    // to do
+                    cpu->V[0xF] = (cpu->V[x] & 0x1) ? 1 : 0;
+                    cpu->V[x] = cpu->V[x] >> 1;
                     break;
                 case 0x8007:
                     if(cpu->V[y] > cpu->V[x]) {
@@ -105,7 +105,8 @@ void execute(Chip8 *cpu, uint16_t opcode) {
                     cpu->V[x] = cpu->V[y] - cpu->V[x];
                     break;
                 case 0x800E:
-                    // to do
+                    cpu->V[0xF] = ((cpu->V[x] >> 7) & 0x1) ? 1 : 0;
+                    cpu->V[x] = cpu->V[x] << 1;
                     break;
             }
             break;
@@ -121,11 +122,27 @@ void execute(Chip8 *cpu, uint16_t opcode) {
             cpu->PC = nnn + cpu->V[0];
             break;
         case 0xC000:
-            // socorro
+            cpu->V[x] = (rand() % 256) & kk;
             break;
-        case 0xD000:
-            // TO DO
+        case 0xD000: {
+            cpu->V[0xF] = 0;
+            int cx = cpu->V[x];
+            int cy = cpu->V[y];
+            
+            for (int i = 0; i < n; i++) {
+                int byte = cpu->memory[cpu->I + i];
+                for(int j = 0; j < 8; j++) {
+                    int currentBit = (byte >> (7 - j)) & 0x1;
+                    int pos = ((cy+i) % 32) * 64 + ((cx+j) % 64);
+                    int turnsOn = currentBit ^ cpu->display[pos];
+                    if (cpu->display[pos] == 1 && currentBit == 1) {
+                        cpu->V[0xF] = 1;
+                    }
+                    cpu->display[pos] = turnsOn;
+                }
+            }
             break;
+        }
         case 0xE000:
             switch(opcode & 0xF0FF) {
                 case 0xE09E:
@@ -145,9 +162,22 @@ void execute(Chip8 *cpu, uint16_t opcode) {
                 case 0xF007:
                     cpu->V[x] = cpu->delay_timer;
                     break;
-                case 0xF00A:
-                    // to do wait for key press
+                case 0xF00A: {
+                    int pressed = -1;
+                    for(int i = 0; i < 16; i++) {
+                        if(cpu->keypad[i] == 1) {
+                            pressed = i;
+                            break;
+                        }
+                    }
+
+                    if(pressed == -1) {
+                        cpu->PC -= 2;
+                    } else {
+                        cpu->V[x] = pressed;
+                    }
                     break;
+                }
                 case 0xF015:
                     cpu->delay_timer = cpu->V[x];
                     break;
@@ -158,7 +188,7 @@ void execute(Chip8 *cpu, uint16_t opcode) {
                     cpu->I += cpu->V[x];
                     break;
                 case 0xF029:
-                    // to do set vx to digit
+                    cpu->I = cpu->V[x] * 5;
                     break;
                 case 0xF033:
                     cpu->memory[cpu->I] = cpu->V[x] / 100;
@@ -166,12 +196,12 @@ void execute(Chip8 *cpu, uint16_t opcode) {
                     cpu->memory[cpu->I+2] = cpu->V[x] % 10;
                     break;
                 case 0xF055:
-                    for (int i = 0; i< x; i++) {
+                    for (int i = 0; i <= x; i++) {
                         cpu->memory[cpu->I + i] = cpu->V[i];
                     }
                     break;
                 case 0xF065:
-                    for(int i = 0; i < x; i++) {
+                    for(int i = 0; i <= x; i++) {
                         cpu->V[i] = cpu->memory[cpu->I + i];
                     }
                     break;

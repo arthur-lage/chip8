@@ -40,6 +40,7 @@ int main (int argc, char *argv[]) {
             }
         }
 
+        display_clear(&display);
         // read and execute instruction from memory
         uint16_t opcode = fetch(&cpu);
         execute(&cpu, opcode);

@@ -27,7 +27,10 @@ int display_init(Display* display) {
     }
     SDL_ShowWindow(window);
 
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL);
+
     display->window = window;
+    display->renderer = renderer;
 
     return 0;
 }
@@ -35,4 +38,10 @@ int display_init(Display* display) {
 void display_quit(Display* display) {
     SDL_DestroyWindow(display->window);
     SDL_Quit();
+}
+
+void display_clear(Display* display) {
+    SDL_SetRenderDrawColor(display->renderer, 0, 0, 0, 255);
+    SDL_RenderClear(display->renderer);
+    SDL_RenderPresent(display->renderer);
 }
